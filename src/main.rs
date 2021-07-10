@@ -2,7 +2,7 @@ extern crate colorize;
 
 use crate::colorize::AnsiColor;
 use futures_util::SinkExt;
-use futures_util::{future, pin_mut, StreamExt};
+use futures_util::{StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::Message;
@@ -50,25 +50,24 @@ const CONNECTION: &str = "wss://etherscan.io/wshandler";
 
 #[tokio::main]
 async fn main() {
-    let (_stdin_tx, stdin_rx) = futures_channel::mpsc::unbounded();
-    let (ws_stream, _) = connect_async(CONNECTION).await.expect("Failed to connect");
-    println!("WebSocket handshake has been successfully completed");
+    let (mut ws_stream, _) = connect_async(CONNECTION).await.expect("Failed to connect");
+    println!(" ✅ WebSocket handshake");
 
-    let (mut write, read) = ws_stream.split();
-    write.send(Message::from(r#"{"event": "gs"}"#)).await.ok();
-    let stdin_to_ws = stdin_rx.map(Ok).forward(write);
+    while let Some(msg) = ws_stream.next().await {
+        let msg = msg.unwrap();
+        if msg.is_text() || msg.is_binary() {
+            let msg_as_string = String::from_utf8(msg.into_data()).expect("Found invalid UTF-8");
 
-    let ws_to_stdout = {
-        read.for_each(|message| async {
-            let data = message.unwrap().into_data();
-            let data_as_json = std::str::from_utf8(&data).unwrap();
-
-            if &data_as_json[0..17] == r#"{"event":"welcome"# {
-                return;
+            if &msg_as_string[0..17] == r#"{"event":"welcome"# {
+                println!(" ✅ Subscribed");
+                ws_stream
+                    .send(Message::from(r#"{"event": "gs"}"#))
+                    .await
+                    .ok();
+                continue;
             }
 
-            let _v: EthScanWebSocketMessage =
-                serde_json::from_str(data_as_json).expect("bad message");
+            let _v: EthScanWebSocketMessage = serde_json::from_str(&msg_as_string).expect("bad message");
 
             for block in _v.blocks {
                 let padded_block = format!(" Block: {} ", block.b_no);
@@ -90,9 +89,6 @@ async fn main() {
                 println!("{}", padded_miner_tag.black().bold().b_yellowb());
                 println!("{}", padded_miner_addy.black().bold().b_greenb());
             }
-        })
-    };
-
-    pin_mut!(stdin_to_ws, ws_to_stdout);
-    future::select(stdin_to_ws, ws_to_stdout).await;
+        }
+    }
 }
