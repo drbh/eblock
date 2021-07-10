@@ -1,0 +1,35 @@
+[package]
+name = 'eblock'
+version = '0.0.0'
+authors = ['https://github.com/drbh']
+edition = '2018'
+description = 'Stream live updates on mined blocks from Ethscan in your shell.'
+license = 'MIT/Apache-2.0'
+keywords = [
+    'ethereum',
+    'blocks',
+    'cli',
+]
+homepage = 'https://github.com/drbh/eblock'
+repository = 'https://github.com/drbh/eblock.git'
+readme = 'README.md'
+
+[dependencies]
+serde_json = '1.0.59'
+futures-util = '0.3.15'
+futures-channel = '0.3.15'
+url = '2.2.2'
+colorize = '0.1.0'
+chrono = '0.4.19'
+
+[dependencies.serde]
+version = '1.0'
+features = ['derive']
+
+[dependencies.tokio]
+version = '1.8.0'
+features = ['full']
+
+[dependencies.tokio-tungstenite]
+version = '*'
+features = ['native-tls']
